@@ -1,284 +1,275 @@
+// ---- START VEXCODE CONFIGURED DEVICES ----
+// Robot Configuration:
+// [Name]               [Type]        [Port(s)]
+// ---- END VEXCODE CONFIGURED DEVICES ----
+// ---- START VEXCODE CONFIGURED DEVICES ----
+// Robot Configuration:
+// [Name]               [Type]        [Port(s)]
+// Distance17           distance      17              
+// ---- END VEXCODE CONFIGURED DEVICES ----
+//By: Dhruv Darbha
+//Last Changed: 3/15/2021
+//Desc: main.cpp to run autonomous and driver control
+
 #include "vex.h"
 #include "robot-config.h"
 #include <iostream>
+#include <cmath>
 
 using namespace vex;
+using namespace std;
 competition Competition;
 
+double WHEEL_RADIUS = 1.625; 
+//double THETA_START = 0;
+
+//Reseting Encoders before use
 void pre_auton(void) {
 // Initializing Robot Configuration.
 vexcodeInit();
+// inertialSensor.resetHeading();
+leftEncoder.resetRotation();
+rightEncoder.resetRotation();
+strafeEncoder.resetRotation();
 // All activities that occur before the competition starts
 // Example: clearing encoders, setting servo positions, ...
 }
 
-double kP = -0.03; //-0.05
-double kI = 0;
-double kD = 0; //-0.02
-double turnkP = -0.2; //-0.2
-double turnkI = 0;
-double turnkD = 0;
-int maxTurnIntegral = 300; // These cap the integrals
-int maxIntegral = 300;
-int integralBound = 3; //If error is outside the bounds, then apply the integral. This is a buffer with +-integralBound degrees
+//Variable defenitions/Odom Constants to be used in the loop 
+                                           
+//Arc length for the robot's movement
+double L = 0;
+double R = 0;
+double S = 0;
 
-//Autonomous Settings
-int desiredValue = 0;
-int desiredTurnValue = 0;
+//Error and kP used for calculating speed
+//double kP = 2;
+double error = 0;
 
-int error; //SensorValue - DesiredValue : Position
-int prevError = 0; //Position 20 miliseconds ago
-int derivative; // error - prevError : Speed
-int totalError = 0; //totalError = totalError + error
+//Diameter of each odom wheel
+double dL = 3.25;
+double dR = 3.25;
+double dS = 3.25;
 
-int turnError; //SensorValue - DesiredValue : Position
-int turnPrevError = 0; //Position 20 miliseconds ago
-int turnDerivative; // error - prevError : Speed
-int turnTotalError = 0; //totalError = totalError + error
+double pi = 3.14159626;
 
-bool resetDriveSensors = false;
+//Circumference of each odom wheel
+double cL = pi * dL;
+double cR = pi * dR;
+double cS = pi * dS;
 
-//Variables modified for use
-bool enableDrivePID = true;
+//Length from the odom wheel to the center
+double wL = 5;
+double wR = 5;
+double wS = 5;
 
-//Pasted from a C++ resource
-double signnum_c(double x) {
-  if (x > 0.0) return 1.0;
-  if (x < 0.0) return -1.0;
-  return x;
+//Angle and total length
+double W = wL + wR + wS;
+double theta = 0;
+
+//L, R, S previous position
+double LPrevPos = 0;
+double RPrevPos = 0;
+double SPrevPos = 0;
+
+//L, R, S position
+double LPos = 0;
+double RPos = 0;
+double SPos = 0;
+
+//L, R, S delta distance
+double totalDeltaDistL = 0;
+double totalDeltaDistR = 0;
+double previousTheta = 0;
+
+//Delta x and y
+double deltaXLocal = 0;
+double deltaYLocal = 0;
+
+//X and Y position
+double xPosGlobal = 0;
+double yPosGlobal = 0;
+
+double currentAbsoluteOrientation = 0;
+
+///////////////////////////////////////////////Odom loop to update encoder values every 10 ms///////////////////////////////////////
+
+int odomUpdate()
+{
+    while(1)
+    {
+      //Getting encoder position
+      int LPos = leftEncoder.position(rotationUnits::deg); //position(rotationUnits::deg)
+      int RPos = rightEncoder.position(rotationUnits::deg); //position(rotationUnits::deg)
+      int SPos = strafeEncoder.position(rotationUnits::deg); //position(rotationUnits::deg)
+
+      // cout<<LPos<<endl;
+      // cout<<RPos<<endl;
+      // cout<<SPos<<endl;
+
+      double deltaDistL = ((LPos - LPrevPos) * pi / 180) * WHEEL_RADIUS;
+      double deltaDistR = ((RPos - RPrevPos) * pi / 180) * WHEEL_RADIUS;
+      double deltaDistS = ((SPos - SPrevPos) * pi / 180) * WHEEL_RADIUS;
+
+      // cout<<deltaDistL<<endl;
+      // cout<<deltaDistR<<endl;
+      // cout<<deltaDistS<<endl;
+
+      //Previous = Current position
+      LPrevPos = LPos;
+      RPrevPos = RPos;
+      SPrevPos = SPos;
+
+      totalDeltaDistL += deltaDistL;
+      totalDeltaDistR += deltaDistR;
+      
+      //Calculating orientation of the robot
+      currentAbsoluteOrientation = theta - ((totalDeltaDistL - totalDeltaDistR) / (wL + wR));
+
+      //cout<<currentAbsoluteOrientation<<endl;
+
+      double deltaTheta = currentAbsoluteOrientation - previousTheta;
+
+      previousTheta = currentAbsoluteOrientation;
+
+      if(deltaTheta == 0)
+      {
+        deltaXLocal = deltaDistS;
+        deltaYLocal = deltaDistL;
+      }
+      else 
+      {
+        deltaXLocal = 2 * sin(deltaTheta / 2.0) * ((deltaDistS / deltaTheta) + wS);
+        deltaYLocal = 2 * sin(deltaTheta / 2.0) * ((deltaDistR / deltaTheta) - wR);
+
+        cout<<deltaXLocal<<endl;
+        cout<<deltaYLocal<<endl;
+      }
+
+      double avgThetaForArc = currentAbsoluteOrientation - (deltaTheta / 2);
+      
+      //Delta X and Y position global calculated
+      double deltaXGlobal = (deltaYLocal * cos(avgThetaForArc)) - (deltaXLocal * sin(avgThetaForArc));
+      double deltaYGlobal = (deltaYLocal * sin(avgThetaForArc)) + (deltaXLocal * cos(avgThetaForArc));
+      
+      // cout<<deltaYGlobal<<endl;
+      // cout<<deltaYGlobal<<endl;
+      
+      //X and Y pos calculated
+      if(abs(deltaXGlobal) < 144 and abs(deltaYGlobal) < 144)
+      {
+        xPosGlobal += deltaXGlobal;
+        yPosGlobal += deltaYGlobal;
+
+      }
+
+      // cout<<xPosGlobal<<endl;
+      // cout<<yPosGlobal<<endl;
+
+      task::sleep(10);
+    }
+    return 0;
 }
 
-void drivePID(double desiredValue){
-  int leftfrontMotorPosition = leftFront.position(degrees);
-  int rightfrontMotorPosition = rightFront.position(degrees);
-  int rightbackMotorPosition = rightBack.position(degrees);
-  int leftbackMotorPosition = leftBack.position(degrees);
-  int averagePosition = (leftfrontMotorPosition + rightfrontMotorPosition + leftbackMotorPosition + rightbackMotorPosition)/4;
-  error = averagePosition - desiredValue;
-  while(error > 30){
+void forwardOdomt(double x2, double y2, double kP, int t = 4000)
+{
+  error = 5;
+  int timeout = 0;
+  while(timeout < t && fabs(error) > 3)
+  {
+    //Error x and y calculated from x and y position
+    double error_x = x2 - xPosGlobal;
+    //double error_y = y2 - yPosGlobal;
 
-    if (resetDriveSensors) {
-      resetDriveSensors = false;
-      leftFront.setPosition(0,degrees);
-      rightFront.setPosition(0,degrees);
-      leftBack.setPosition(0,degrees);
-      rightBack.setPosition(0,degrees);
-    }
+    //Speed of the robot movement calculated
+    double speed = error_x * kP;
+    //cout<<speed<<endl;
+    leftFront.spin(directionType::fwd,  speed, percentUnits::pct);
+    rightFront.spin(directionType::fwd, speed, percentUnits::pct);
+    leftBack.spin(directionType::fwd, speed, percentUnits::pct);
+    rightBack.spin(directionType::fwd, speed, percentUnits::pct);
 
-    //Get the position of four motors
-    int leftfrontMotorPosition = leftFront.position(degrees);
-    int rightfrontMotorPosition = rightFront.position(degrees);
-    int rightbackMotorPosition = rightBack.position(degrees);
-    int leftbackMotorPosition = leftBack.position(degrees);
-    ///////////////////////////////////////////
-    //Lateral movement PID
-    /////////////////////////////////////////////////////////////////////
-    //Get average of the four motors
-    int averagePosition = (leftfrontMotorPosition + rightfrontMotorPosition + leftbackMotorPosition + rightbackMotorPosition)/4;
-    
-    //Potential
-    error = averagePosition - desiredValue;
-
-    //Derivative
-    derivative = error - prevError;
-
-    //Integral
-    if(abs(error) < integralBound){
-    totalError+=error; 
-    }  else {
-    totalError = 0; 
-    }
-    //totalError += error;
-    //This would cap the integral
-    totalError = abs(totalError) > maxIntegral ? signnum_c(totalError) * maxIntegral : totalError;
-
-    double lateralMotorPower = error * kP + derivative * kD;
-    /////////////////////////////////////////////////////////////////////
-
-
-    ///////////////////////////////////////////
-    //Turning movement PID
-    /////////////////////////////////////////////////////////////////////
-    //Get average of the two motors
-    int turnDifference = leftfrontMotorPosition && leftbackMotorPosition - rightbackMotorPosition && rightfrontMotorPosition;
-
-    //Potential
-    turnError = turnDifference - desiredTurnValue;
-
-    //Derivative
-    turnDerivative = turnError - turnPrevError;
-
-    //Integral
-    if(abs(error) < integralBound){
-    turnTotalError+=turnError; 
-    }  else {
-    turnTotalError = 0; 
-    }
-    //turnTotalError += turnError;
-
-    //This would cap the integral
-    turnTotalError = abs(turnTotalError) > maxIntegral ? signnum_c(turnTotalError) * maxIntegral : turnTotalError;
-
-     double turnMotorPower = turnError * turnkP + turnDerivative * turnkD + turnTotalError * turnkI;
-    /////////////////////////////////////////////////////////////////////
-
-    leftFront.spin(forward, lateralMotorPower + turnMotorPower , voltageUnits::volt);
-    leftBack.spin(forward, lateralMotorPower + turnMotorPower, voltageUnits::volt); //reverse
-    rightFront.spin(forward, lateralMotorPower - turnMotorPower , voltageUnits::volt);
-    rightBack.spin(forward, lateralMotorPower - turnMotorPower , voltageUnits::volt); //reverse
-
-    prevError = error;
-    turnPrevError = turnError;
-    //vex::task::sleep(20);
+    task::sleep(2);
+    timeout += 5;
   }
 
+  //speed = 0;
   leftFront.stop();
   rightFront.stop();
   leftBack.stop();
   rightBack.stop();
-
+  //cout<<"Done"<<endl;
 }
 
-double reading = 0;
-int updateTurn()
+
+void slideOdom(double x2a, double y2a, double kP1)
 {
   while(true)
   {
-    reading = inertialSensor.value();
-    std::cout<<reading<<std::endl;
+    //Error x and y calculated from x and y position
+    double error_x = x2a - xPosGlobal;
+    double error_y = y2a - yPosGlobal;
+    cout<<error_y<<endl;
+    //cout<<error_y<<endl;
+    // cout<<xPosGlobal<<endl;
+    //cout<<yPosGlobal<<endl;
+    double error = sqrt((error_x*error_x) + (error_y*error_y));
+
+    //Speed of the robot movement calculated
+    double speed = error_y * kP1;
+    //cout<<speed<<endl;
+
+    leftFront.spin(directionType::fwd, speed, percentUnits::pct);
+    rightFront.spin(directionType::rev, speed, percentUnits::pct);
+    leftBack.spin(directionType::rev, speed, percentUnits::pct);
+    rightBack.spin(directionType::fwd, speed, percentUnits::pct);
+
+    //If statement to move until error reaches a small value
+    if(error < 1) //2
+    {
+      speed = 0;
+      leftFront.stop();
+      rightFront.stop();
+      leftBack.stop();
+      rightBack.stop();
+
+      break;
+    }
+    task::sleep(5);
   }
-  return 1;
 }
 
-void turnDegrees(double deg)
+void turnOdom(double dangle, double kPt, int t = 1000)
 {
-  turnError = deg - desiredTurnValue;
-  while(turnError > 2)
+  double turnError = 5;
+  int timeout = 0;
+  while(timeout < t && turnError > 1)
   {
-    turnError = deg - desiredTurnValue;
-    double turnMotorPower = turnError * turnkP;    
-    leftFront.spin(forward, turnMotorPower, voltageUnits::volt);
-    leftBack.spin(forward, turnMotorPower, voltageUnits::volt); //reverse
-    rightFront.spin(forward, turnMotorPower, voltageUnits::volt);
-    rightBack.spin(forward, turnMotorPower, voltageUnits::volt);
-  }  
+    double turnError = currentAbsoluteOrientation - dangle;
+    cout<<"Dangle: "<<dangle<<endl;
+    cout<<"TurnError: "<<turnError<<endl;
+    cout<<"CurrentAbdPos: "<<currentAbsoluteOrientation<<endl;
+
+    double speed = turnError * kPt;
+
+    leftFront.spin(directionType::fwd, speed, percentUnits::pct);
+    rightFront.spin(directionType::rev, speed, percentUnits::pct);
+    leftBack.spin(directionType::fwd, speed, percentUnits::pct);
+    rightBack.spin(directionType::rev, speed, percentUnits::pct);
+
+    //If statement to move until error reaches a small value
+
+    task::sleep(1);
+    timeout += 1;
+  }
+
   leftFront.stop();
   rightFront.stop();
   leftBack.stop();
   rightBack.stop();
+  
+  cout<<"Done"<<endl;
 }
-
-void rightTurn(int t) 
-{
-  //t = 350 is a 90 degree turn
-  leftFront.startRotateFor(directionType::fwd, -t, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightFront.startRotateFor(directionType::fwd, t, rotationUnits::deg, 30, velocityUnits::rpm);
-  leftBack.startRotateFor(directionType::fwd, -t, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightBack.rotateFor(directionType::fwd, t, rotationUnits::deg, 30, velocityUnits::rpm);
-}
-
-void leftTurn(int x) 
-{
-  leftFront.startRotateFor(directionType::fwd, x, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightFront.startRotateFor(directionType::fwd, -x, rotationUnits::deg, 30, velocityUnits::rpm);
-  leftBack.startRotateFor(directionType::fwd, x, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightBack.rotateFor(directionType::fwd, -x, rotationUnits::deg, 30, velocityUnits::rpm);
-}
-
-
-void moveForward(int d)
-{
-  //d = 650 is 24 inches
-  leftFront.startRotateFor(directionType::fwd, -d, rotationUnits::deg, 40, velocityUnits::rpm);
-  rightFront.startRotateFor(directionType::fwd, -d, rotationUnits::deg, 40, velocityUnits::rpm);
-  leftBack.startRotateFor(directionType::fwd, -d, rotationUnits::deg, 40, velocityUnits::rpm);
-  rightBack.rotateFor(directionType::fwd, -d, rotationUnits::deg, 40, velocityUnits::rpm);
-}
-
-void speedForward(int s)
-{
-  //d = 650 is 24 inches
-  leftFront.startRotateFor(directionType::fwd, -s, rotationUnits::deg, 80, velocityUnits::rpm);
-  rightFront.startRotateFor(directionType::fwd, -s, rotationUnits::deg, 80, velocityUnits::rpm);
-  leftBack.startRotateFor(directionType::fwd, -s, rotationUnits::deg, 80, velocityUnits::rpm);
-  rightBack.rotateFor(directionType::fwd, -s, rotationUnits::deg, 80, velocityUnits::rpm);
-}
-
-void forwardIntake(int x)
-{
-  intakeRight.spin(directionType::fwd, 100, percentUnits::pct);
-  intakeLeft.spin(directionType::rev, 100, percentUnits::pct);
-  moveForward(x);
-  intakeRight.stop();
-  intakeLeft.stop();
-}
-
-void spinOutakes(double o)
-{
-  outtakeUp.spin(directionType::fwd, 90, percentUnits::pct);
-  wait(o, sec);
-  outtakeUp.stop();
-}
-
-void spinIntakes(int t)
-{
-  intakeRight.spin(directionType::fwd, 100, percentUnits::pct);
-  intakeLeft.spin(directionType::rev, 100, percentUnits::pct);
-  wait(t, sec);
-  intakeRight.stop();
-  intakeLeft.stop();
-}
-
-void backSpinIntakes(int t)
-{
-  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
-  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
-  wait(t, sec);
-  intakeRight.stop();
-  intakeLeft.stop();
-}
-
-void backSpinOutakes(double o)
-{
-  outtakeUp.spin(directionType::rev, 90, percentUnits::pct);
-  wait(o, sec);
-  outtakeUp.stop();
-}
-
-void intOut(double i)
-{
-  intakeRight.spin(directionType::fwd, 100, percentUnits::pct);
-  intakeLeft.spin(directionType::rev, 100, percentUnits::pct);
-  spinOutakes(i);
-  intakeRight.stop();
-  intakeLeft.stop();
-}
-
-void moveBackward(int b)
-{
-  leftFront.startRotateFor(directionType::fwd, b, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightFront.startRotateFor(directionType::fwd, b, rotationUnits::deg, 30, velocityUnits::rpm);
-  leftBack.startRotateFor(directionType::fwd, b, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightBack.rotateFor(directionType::fwd, b, rotationUnits::deg, 30, velocityUnits::rpm);
-}
-
-void strafe(int s)
-{
-  leftFront.startRotateFor(directionType::rev, s, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightFront.startRotateFor(directionType::fwd, s, rotationUnits::deg, 30, velocityUnits::rpm);
-  leftBack.startRotateFor(directionType::fwd, s, rotationUnits::deg, 30, velocityUnits::rpm);
-  rightBack.rotateFor(directionType::rev, s, rotationUnits::deg, 30, velocityUnits::rpm);
-}  
-
-void backIntake(int j)
-{
-  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
-  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
-  moveBackward(j);
-  intakeRight.stop();
-  intakeLeft.stop();
-}
-
 
 /*---------------------------------------------------------------------------*/
 /*                                                                           */
@@ -290,83 +281,12 @@ void backIntake(int j)
 /*  You must modify the code to add your own robot specific commands here.   */
 /*---------------------------------------------------------------------------*/
 
-void autonomous(void) {
+void autonomous(void) 
+{
+  forwardOdom(10, 0, 2); // 10 inches forward at a speed multiplier of 2
+  turnOdom(90, 2) //turn 90 degrees at a speed multiplier of 2
+  wait(60, sec);
 
-  //38.21 ticks per inch
-  //1000 ticks to get to center field
-  //resetDriveSensors = true;
-  // Skills auton
-  // drivePID(-955);
-  // moveBackward(200);
-  // wait(0.5, sec);
-  // moveForward(280);
-  // moveBackward(200);
-  // moveForward(250);
-  // wait(1, sec);
-  // moveBackward(100);
-  // strafe(-200);
-  // moveForward(100);
-  // //rightTurn(150);
-  // wait(0.5, sec);
-  // spinOutakes(3);
-  // wait(1, sec);
-  // moveBackward(300);
-
-  spinOutakes(0.2);
-  forwardIntake(425);
-  //leftTurn(280);
-  //moveForward(350);
-  leftTurn(425);
-  moveForward(525);
-  wait(0.5, sec);
-  spinOutakes(0.5);
-  //intOut(1);
-  forwardIntake(-100);
-  //spinIntakes(2);
-  //moveBackward(100);
-  //backIntake(2);
-  moveForward(125);
-  //spinIntakes(1);
-  forwardIntake(-200);
-  //spinIntakes(2);
-  //backIntake(2);
-  moveBackward(100);
-  leftTurn(280);
-  backSpinOutakes(0.5);
-  backSpinIntakes(2);
-  rightTurn(280);
-  moveForward(325);
-  spinOutakes(0.75);
-  moveBackward(200);
-  rightTurn(165);
-  strafe(150);
-  moveForward(275);
-  forwardIntake(-300);
-  //wait(1, sec);
-  // spinIntakes(3);
-  // spinOutakes(2);
-  //spinOutakes(2);
-  //intOut(3);
-  //wait(1, sec);
-  //moveBackward(300);
-  wait(0.5, sec);
-  rightTurn(280);
-  moveBackward(450);
-  moveForward(700);
-  strafe(575);
-  //leftTurn(100);
-  //rightTurn(280);
-  speedForward(250);
-  moveBackward(100);
-  speedForward(200);
-  moveBackward(100);
-  //leftTurn(75);
-  //strafe(50);
-  speedForward(150);
-  wait(1, sec);
-  intOut(1);
-  //spinOutakes(1);
-  wait(1, sec);
 }
 
 
@@ -375,19 +295,21 @@ void usercontrol(void) {
   while(1)
   {
 
+    //Arcade Drive Code:
+    // rightFront.spin(forward, (-Controller1.Axis2.value() + Controller1.Axis1.value()) * 0.5 + (Controller1.Axis4.value()) * 0.25, percent);
+    // leftBack.spin(forward, (-Controller1.Axis2.value() + Controller1.Axis1.value()) * 0.5 - (Controller1.Axis4.value()) * 0.25, percent);
+    // leftFront.spin(forward, (-Controller1.Axis2.value() - Controller1.Axis1.value()) * 0.5 - (Controller1.Axis4.value()) * 0.25, percent);
+    // rightBack.spin(forward, (-Controller1.Axis2.value() - Controller1.Axis1.value()) * 0.5 + (Controller1.Axis4.value()) * 0.25, percent);
 
-    //Code that works:
-    // rightFront.spin(forward, (-Controller1.Axis2.value() + Controller1.Axis1.value() + Controller1.Axis4.value()) * 0.2, percent);
-    // leftBack.spin(forward, (-Controller1.Axis2.value() + Controller1.Axis1.value() - Controller1.Axis4.value()) * 0.2, percent);
-    // leftFront.spin(forward, (-Controller1.Axis2.value() - Controller1.Axis1.value() - Controller1.Axis4.value()) * 0.2, percent);
-    // rightBack.spin(forward, (-Controller1.Axis2.value() - Controller1.Axis1.value() + Controller1.Axis4.value()) * 0.2, percent);
+	//Tank Drive Code
+    int forward = Controller1.Axis3.position(vex::percent);
+    int sideways = Controller1.Axis4.position(vex::percent);
+    int turn1 = Controller1.Axis1.position(vex::percent);
 
-
-    //Code:
-    rightFront.spin(forward, (-Controller1.Axis2.value() + Controller1.Axis1.value()) * 0.6 + (Controller1.Axis4.value()) * 0.25, percent);
-    leftBack.spin(forward, (-Controller1.Axis2.value() + Controller1.Axis1.value()) * 0.6 - (Controller1.Axis4.value()) * 0.25, percent);
-    leftFront.spin(forward, (-Controller1.Axis2.value() - Controller1.Axis1.value()) * 0.6 - (Controller1.Axis4.value()) * 0.25, percent);
-    rightBack.spin(forward, (-Controller1.Axis2.value() - Controller1.Axis1.value()) * 0.6 + (Controller1.Axis4.value()) * 0.25, percent);
+    rightFront.spin(vex::forward, forward - sideways + turn1, vex::percent);
+    leftFront.spin(vex::forward,  forward + sideways - turn1, vex::percent);
+    rightBack.spin(vex::forward,  forward + sideways + turn1, vex::percent);
+    leftBack.spin(vex::forward,   forward - sideways - turn1, vex::percent);
 
 
 
@@ -410,12 +332,12 @@ void usercontrol(void) {
     if(Controller1.ButtonL1.pressing())
     {
       outtakeUp.spin(vex::directionType::fwd, 100, vex::velocityUnits::pct);
-      //outtakeDown.spin(vex::directionType::fwd, 100, vex::velocityUnits::pct);    
+      //outtakeUp2.spin(vex::directionType::fwd, 100, vex::velocityUnits::pct);    
     }
     else if(Controller1.ButtonL2.pressing())
     {
       outtakeUp.spin(vex::directionType::rev, 100, vex::velocityUnits::pct);
-      //outtakeDown.spin(vex::directionType::fwd, 100, vex::velocityUnits::pct);    
+      //outtakeUp2.spin(vex::directionType::fwd, 100, vex::velocityUnits::pct);    
     }
     else
     {
@@ -426,9 +348,11 @@ void usercontrol(void) {
 
 } 
 
+task* odomTask = new task(odomUpdate);
 
 int main() 
 {
+  odomTask->resume();
   Competition.autonomous(autonomous);
   Competition.drivercontrol(usercontrol);
 }
