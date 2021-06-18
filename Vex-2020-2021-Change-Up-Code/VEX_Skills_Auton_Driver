@@ -283,10 +283,147 @@ void turnOdom(double dangle, double kPt, int t = 1000)
 
 void autonomous(void) 
 {
-  forwardOdom(10, 0, 2); // 10 inches forward at a speed multiplier of 2
-  turnOdom(90, 2) //turn 90 degrees at a speed multiplier of 2
-  wait(60, sec);
+  
+  //FIRST GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-20, 0, 3);  //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  wait(0.1, sec);
+  turnOdom(-150, 1);
+  forwardOdom(-20, 0, 3);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(30, 0, 3);
+  //get rid of descored balls
+  revIntOut(0.5);
+  turnOdom(150, 1);
 
+  //SECOND GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-50, 0, 3);  //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  turnOdom(-90, 1);
+  forwardOdom(-15, 0, 2);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(30, 0, 3);
+  //get rid of descored balls
+  revIntOut(0.5);
+  slideOdom(0, -50, 3);
+  wait(0.1, sec);
+
+  //THIRD GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-30, 0, 3); //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  wait(0.1, sec);
+  forwardOdom(30, 0, 3);
+  turnOdom(45, 1);
+  forwardOdom(-30, 0, 3);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(30, 0, 3);
+  //gets rid of descored balls
+  revIntOut(0.5);
+  turnOdom(135, 1);
+  wait(0.1, sec);
+
+  //FOURTH GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-50, 0, 3); //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  turnOdom(-90, 1);
+  forwardOdom(-15, 0, 3);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(20, 0, 3);
+  //get rid of descored balls
+  revIntOut(0.5);
+  turnOdom(90, 1);
+  wait(0.1, sec);
+
+  //FIFTH GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-40, 0, 3); //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  turnOdom(-45, 1);
+  wait(0.1, sec);
+  forwardOdom(-30, 0, 3);
+  intOut(0.75);
+  forwardOdom(20, 0, 3);
+  //gets rid of descored balls
+  revIntOut(0.5);
+  wait(0.1, sec);
+  turnOdom(45, 1);
+  forwardOdom(30, 0, 3);
+  turnOdom(90, 1);
+  wait(0.1, sec);
+
+  //CENTER GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-100, 0, 3); //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  turnOdom(90, 1);
+  forwardOdom(-15, 0, 5);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(20, 0, 3);
+  turnOdom(150, 1);
+  wait(0.1, sec);
+  slideOdom(20, 0, 3);
+  
+  //SIXTH GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-30, 0, 3); //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  intOut(0.75);
+  forwardOdom(20, 0, 3);
+  //gets rid of descored balls
+  revIntOut(0.5);
+  slideOdom(-50, 0, 3);
+  wait(0.1, sec);
+
+  //SEVENTH GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-30, 0, 3);
+  intakeRight.stop();
+  intakeLeft.stop();
+  wait(0.1, sec);
+  forwardOdom(30, 0, 3);
+  turnOdom(45, 1);
+  wait(0.1, sec);
+  forwardOdom(-30, 0, 3);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(15, 0, 3);
+  turnOdom(135, 1);
+  wait(0.1, sec);
+
+  //EIGTH GOAL
+  intakeRight.spin(directionType::rev, 100, percentUnits::pct);
+  intakeLeft.spin(directionType::fwd, 100, percentUnits::pct);
+  forwardOdom(-40, 0, 3); //intake
+  intakeRight.stop();
+  intakeLeft.stop();
+  turnOdom(-90, 1);
+  intOut(0.75);
+  wait(0.1, sec);
+  forwardOdom(30, 0, 3);
 }
 
 
